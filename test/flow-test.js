@@ -1,6 +1,5 @@
 const sinon = require('sinon');
 const should = require('chai').should();
-const expect = require('chai').expect;
 const assert = require('assert');
 
 const flow = require('../lib/flow.js');
@@ -14,15 +13,19 @@ describe('Flow.js library', function () {
         it('should call callback when functions array is empty', function () {
             var spy = sinon.spy();
             flow.serial([], spy);
-            expect(spy.calledOnce);
+            assert(spy.calledOnce);
         });
         it('should call callback when no functions left', function () {
             var spy = sinon.spy();
             flow.serial([
-                function () {},
-                function () {}
+                function (cb) {
+                    cb();
+                },
+                function (data, cb) {
+                    cb();
+                }
             ], spy);
-            expect(spy.calledOnce);
+            assert(spy.calledOnce);
         });
         it('should call second function with result of first function', function () {
             var spy = sinon.spy();
@@ -32,10 +35,8 @@ describe('Flow.js library', function () {
                 },
                 spy
             ];
-            flow.serial(funcs, function () {
-                return 1;
-            });
-            expect(spy.calledWithExactly(null, 'hello'));
+            flow.serial(funcs, function () {});
+            assert(spy.calledWith('hello'));
         });
         it('should call main callback if first function return error', function () {
             var callback = sinon.spy();
@@ -48,7 +49,7 @@ describe('Flow.js library', function () {
                 }
             ];
             flow.serial(funcs, callback);
-            expect(callback.calledWithExactly('error'));
+            assert(callback.calledWith('error'));
         });
         it('should not call second function if first function return error', function () {
             var spy = sinon.spy();
@@ -56,12 +57,15 @@ describe('Flow.js library', function () {
                 function (cb) {
                     cb('error', 1);
                 },
+                function (cb) {
+                    cb(null, 2);
+                },
                 spy
             ];
             flow.serial(funcs, function () {
                 return 1;
             });
-            expect(spy.notCalled);
+            assert(spy.notCalled);
         });
         it('should pass last result to callback', function () {
             var funcs = [
@@ -77,36 +81,46 @@ describe('Flow.js library', function () {
             ];
             var spy = sinon.spy();
             flow.serial(funcs, spy);
-            expect(spy.calledWithExactly(null, 3));
+            assert(spy.calledWithExactly(null, 3));
         });
         it('should run all functions in array', function () {
-            var spy1 = sinon.spy();
-            var spy2 = sinon.spy();
-            var spy3 = sinon.spy();
             var funcs = [
-                spy1,
-                spy2,
-                spy3
+                function (cb) {
+                    cb(null, 1);
+                },
+                function (data, cb) {
+                    cb(null, 2);
+                },
+                function (data, cb) {
+                    cb(null, 3);
+                }
             ];
-            flow.serial(funcs, function () {});
-            expect(spy1.calledOnce);
-            expect(spy2.calledOnce);
-            expect(spy3.calledOnce);
+            var spy1 = sinon.spy(funcs[0]);
+            var spy2 = sinon.spy(funcs[1]);
+            var spy3 = sinon.spy(funcs[2]);
+            flow.serial([spy1, spy2, spy3], function () {});
+            assert(spy1.calledOnce);
+            assert(spy2.calledOnce);
+            assert(spy3.calledOnce);
         });
     });
     describe('Parallel', function () {
         it('should call callback if functions array is empty', function () {
             var spy = sinon.spy();
             flow.parallel([], spy);
-            expect(spy.calledOnce);
+            assert(spy.calledOnce);
         });
         it('should call callback when no functions left', function () {
             var spy = sinon.spy();
             flow.parallel([
-                function () {},
-                function () {}
+                function (cb) {
+                    cb();
+                },
+                function (cb) {
+                    cb();
+                }
             ], spy);
-            expect(spy.calledOnce);
+            assert(spy.calledOnce);
         });
         it('should call main callback if first function returns error', function () {
             var callback = sinon.spy();
@@ -119,7 +133,7 @@ describe('Flow.js library', function () {
                 }
             ];
             flow.parallel(funcs, callback);
-            expect(callback.calledWithExactly('error'));
+            assert(callback.called);
         });
         it('should run all functions in array', function () {
             var spy1 = sinon.spy();
@@ -131,9 +145,9 @@ describe('Flow.js library', function () {
                 spy3
             ];
             flow.parallel(funcs, function () {});
-            expect(spy1.calledOnce);
-            expect(spy2.calledOnce);
-            expect(spy3.calledOnce);
+            assert(spy1.calledOnce);
+            assert(spy2.calledOnce);
+            assert(spy3.calledOnce);
         });
         it('should call main callback with array of results of all functions', function () {
             var spy = sinon.spy();
@@ -149,15 +163,48 @@ describe('Flow.js library', function () {
                 }
             ];
             flow.parallel(funcs, spy);
-            expect(spy.calledWithExactly(null, [1, 2, 3]));
+            assert(spy.calledWithExactly(null, [1, 2, 3]));
         });
 
     });
     describe('Map', function () {
-        it('should call callback when no functions left', function () {
+        it('should call callback when values array is empty', function () {
             var spy = sinon.spy();
-            flow.map([], [], spy);
-            expect(spy.calledOnce);
+            flow.map([], function () {}, spy);
+            assert(spy.calledOnce);
         });
+        it('should call callback when no values left', function () {
+            var spy = sinon.spy();
+            flow.map(
+                [1, 2],
+                function (value, cb) {
+                    cb(null, value);
+                },
+            spy);
+            assert(spy.calledOnce);
+        });
+        it('should call function with all values', function () {
+            var spy = sinon.spy();
+            flow.map(
+                [1, 2, 3],
+                spy,
+                function () {}
+            );
+            assert(spy.calledThrice);
+            assert(spy.calledWith(1));
+            assert(spy.calledWith(2));
+            assert(spy.calledWith(3));
+        });
+        it('should call callback with array of results of all function calls', function () {
+            var spy = sinon.spy();
+            flow.map(
+                [1, 2, 3],
+                function (value, cb) {
+                    cb(null, value);
+                },
+                spy);
+            assert(spy.calledWithExactly(null, [1,2,3]));
+        });
+
     });
 });
