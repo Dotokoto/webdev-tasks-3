@@ -8,6 +8,15 @@ describe('Flow.js library', function () {
             flow.serial([], spy);
             sinon.assert.calledOnce(spy);
         });
+        it('should run correctly without main callback', function () {
+            var spy = sinon.spy(function (cb) {
+                setTimeout(function () {
+                    cb();
+                }, 50);
+            });
+            flow.serial([spy]);
+            sinon.assert.calledOnce(spy);
+        });
         it('should call callback when no functions left', function () {
             var spyCb = sinon.spy(function () {
                 sinon.assert.spyCb.calledAfter(spySerial1);
